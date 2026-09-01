@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de tareas · Copropiedades</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <h1 class="app-header__title">Registro de tareas</h1>
+      <p class="app-header__subtitle">Administración de copropiedades</p>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="card add-task">
+      <h2 class="add-task__heading">Agregar tarea</h2>
+      <form id="task-form" class="add-task__form">
+        <div class="field field--full">
+          <label for="description">¿Qué hay que hacer?</label>
+          <textarea id="description" name="description" rows="2" placeholder="Ej: Revisar filtración en el parqueadero" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="copropiedad">Copropiedad</label>
+            <input id="copropiedad" name="copropiedad" list="copropiedades-list" placeholder="Ej: Torres del Parque" required>
+            <datalist id="copropiedades-list"></datalist>
+          </div>
+          <button type="submit" class="btn btn--primary" id="submit-btn">Guardar tarea</button>
+        </div>
+      </form>
+      <p id="form-error" class="form-error" hidden></p>
+    </section>
+
+    <nav class="tabs" aria-label="Filtrar por estado">
+      <button class="tab tab--active" data-tab="pending" type="button">
+        Pendientes <span class="tab__count" id="count-pending">0</span>
+      </button>
+      <button class="tab" data-tab="completed" type="button">
+        Completadas <span class="tab__count" id="count-completed">0</span>
+      </button>
+    </nav>
+
+    <div class="filter-bar">
+      <label for="filter-copropiedad" class="filter-bar__label">Copropiedad</label>
+      <select id="filter-copropiedad">
+        <option value="all">Todas</option>
+      </select>
+    </div>
+
+    <div id="status-banner" class="status-banner" hidden></div>
+
+    <ul id="task-list" class="task-list"></ul>
+
+    <p id="empty-state" class="empty-state" hidden></p>
+  </main>
+
+  <footer class="app-footer">
+    <p>Los datos quedan guardados de forma permanente.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
