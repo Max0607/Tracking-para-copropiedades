@@ -8,7 +8,7 @@ const state = {
   error: null,
 };
 
-const TAG_COLORS = ['#2F5D50', '#C98A2E', '#4A6FA5', '#8B5E83', '#3F7D5C', '#A4562B', '#5C6BC0', '#7A6C53'];
+const TAG_COLORS = ['#1F6B55', '#D9932F', '#3E6FA6', '#8B5E83', '#4F8F6C', '#A4562B', '#5C6BC0', '#7A6C53'];
 
 function colorForName(name) {
   let hash = 0;
@@ -40,12 +40,39 @@ const els = {
   tabs: document.querySelectorAll('.tab'),
   countPending: document.getElementById('count-pending'),
   countCompleted: document.getElementById('count-completed'),
-  filterSelect: document.getElementById('filter-copropiedad'),
+  chipBar: document.getElementById('chip-bar'),
   statusBanner: document.getElementById('status-banner'),
   taskList: document.getElementById('task-list'),
   emptyState: document.getElementById('empty-state'),
+  emptyStateText: document.getElementById('empty-state__text'),
+  fab: document.getElementById('fab'),
+  modalBackdrop: document.getElementById('modal-backdrop'),
+  modalClose: document.getElementById('modal-close'),
 };
 
+/* ---------- Modal ---------- */
+function openModal() {
+  els.modalBackdrop.hidden = false;
+  els.formError.hidden = true;
+  requestAnimationFrame(() => els.description.focus());
+  document.addEventListener('keydown', onModalKeydown);
+}
+function closeModal() {
+  els.modalBackdrop.hidden = true;
+  els.form.reset();
+  els.formError.hidden = true;
+  document.removeEventListener('keydown', onModalKeydown);
+}
+function onModalKeydown(e) {
+  if (e.key === 'Escape') closeModal();
+}
+els.fab.addEventListener('click', openModal);
+els.modalClose.addEventListener('click', closeModal);
+els.modalBackdrop.addEventListener('click', (e) => {
+  if (e.target === els.modalBackdrop) closeModal();
+});
+
+/* ---------- Data ---------- */
 async function loadTasks() {
   state.loading = true;
   state.error = null;
@@ -77,8 +104,8 @@ async function addTask(description, copropiedad) {
     }
     const task = await res.json();
     state.tasks.unshift(task);
-    els.form.reset();
     state.tab = 'pending';
+    closeModal();
     render();
   } catch (err) {
     els.formError.textContent = err.message;
@@ -129,14 +156,32 @@ function getCopropiedades() {
   return [...new Set(state.tasks.map((t) => t.copropiedad))].sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-function updateFilterOptions() {
+/* ---------- Render ---------- */
+function renderChipBar() {
   const names = getCopropiedades();
-  const current = els.filterSelect.value;
-  els.filterSelect.innerHTML = '<option value="all">Todas</option>' +
-    names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  if (names.includes(current)) els.filterSelect.value = current;
 
   els.copropiedadesList.innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
+
+  if (state.filter !== 'all' && !names.includes(state.filter)) state.filter = 'all';
+
+  const chips = ['all', ...names];
+  els.chipBar.innerHTML = '';
+  chips.forEach((name) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip' + (state.filter === name ? ' chip--active' : '');
+    if (name !== 'all') {
+      chip.style.setProperty('--chip-color', colorForName(name));
+      chip.innerHTML = `<span class="chip__dot"></span>${escapeHtml(name)}`;
+    } else {
+      chip.textContent = 'Todas';
+    }
+    chip.addEventListener('click', () => {
+      state.filter = name;
+      render();
+    });
+    els.chipBar.appendChild(chip);
+  });
 }
 
 function checkIconSvg() {
@@ -204,7 +249,9 @@ function render() {
   }
 
   els.tabs.forEach((btn) => {
-    btn.classList.toggle('tab--active', btn.dataset.tab === state.tab);
+    const active = btn.dataset.tab === state.tab;
+    btn.classList.toggle('tab--active', active);
+    btn.setAttribute('aria-selected', String(active));
   });
 
   const pending = state.tasks.filter((t) => !t.completed);
@@ -212,7 +259,7 @@ function render() {
   els.countPending.textContent = pending.length;
   els.countCompleted.textContent = completed.length;
 
-  updateFilterOptions();
+  renderChipBar();
 
   let list = state.tab === 'pending' ? pending : completed;
   if (state.filter !== 'all') {
@@ -226,7 +273,7 @@ function render() {
   }
   if (!list.length) {
     els.emptyState.hidden = false;
-    els.emptyState.textContent = state.tab === 'pending'
+    els.emptyStateText.textContent = state.tab === 'pending'
       ? 'No hay tareas pendientes. ¡Buen trabajo!'
       : 'Aún no hay tareas completadas.';
   } else {
@@ -252,11 +299,6 @@ els.tabs.forEach((btn) => {
     state.tab = btn.dataset.tab;
     render();
   });
-});
-
-els.filterSelect.addEventListener('change', () => {
-  state.filter = els.filterSelect.value;
-  render();
 });
 
 loadTasks();
