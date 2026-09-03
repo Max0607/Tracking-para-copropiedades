@@ -29,6 +29,27 @@ async function initDb() {
       completed_at TIMESTAMPTZ
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS copropiedades (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL
+    );
+  `);
+
+  // Evita duplicados sin importar mayúsculas/minúsculas (ej. "Los Robles" y "los robles")
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS copropiedades_name_lower_idx
+    ON copropiedades (LOWER(name));
+  `);
+
+  // Migración: si ya había tareas con copropiedades escritas a mano, las
+  // agrega automáticamente a la lista para que no se pierda nada.
+  await pool.query(`
+    INSERT INTO copropiedades (name)
+    SELECT DISTINCT copropiedad FROM tasks
+    ON CONFLICT ((LOWER(name))) DO NOTHING;
+  `);
 }
 
 app.use(express.json());
@@ -94,6 +115,66 @@ app.delete('/api/tasks/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'No se pudo eliminar la tarea.' });
+  }
+});
+
+// Listar copropiedades (para el dropdown y el panel de administración)
+app.get('/api/copropiedades', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM copropiedades ORDER BY LOWER(name) ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudieron obtener las copropiedades.' });
+  }
+});
+
+// Agregar una copropiedad nueva a la lista
+app.post('/api/copropiedades', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'El nombre de la copropiedad es obligatorio.' });
+  }
+  const trimmed = name.trim();
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO copropiedades (name) VALUES ($1) RETURNING *',
+      [trimmed]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      // Ya existe (comparación sin distinguir mayúsculas/minúsculas): la devolvemos tal cual.
+      const { rows } = await pool.query('SELECT * FROM copropiedades WHERE LOWER(name) = LOWER($1)', [trimmed]);
+      return res.status(200).json(rows[0]);
+    }
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo agregar la copropiedad.' });
+  }
+});
+
+// Eliminar una copropiedad (solo si ya no tiene tareas asociadas)
+app.delete('/api/copropiedades/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT name FROM copropiedades WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Copropiedad no encontrada.' });
+
+    const { rows: usageRows } = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM tasks WHERE LOWER(copropiedad) = LOWER($1)',
+      [rows[0].name]
+    );
+    if (usageRows[0].count > 0) {
+      return res.status(409).json({
+        error: `No se puede eliminar: tiene ${usageRows[0].count} tarea(s) asociada(s). Elimina o reasigna esas tareas primero.`,
+      });
+    }
+
+    await pool.query('DELETE FROM copropiedades WHERE id = $1', [id]);
+    res.status(204).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo eliminar la copropiedad.' });
   }
 });
 

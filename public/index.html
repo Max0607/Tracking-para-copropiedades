@@ -13,8 +13,14 @@
 <body>
   <header class="app-header">
     <div class="app-header__inner">
-      <h1 class="app-header__title">Registro de tareas</h1>
-      <p class="app-header__subtitle">Administración de copropiedades</p>
+      <div>
+        <h1 class="app-header__title">Registro de tareas</h1>
+        <p class="app-header__subtitle">Administración de copropiedades</p>
+      </div>
+      <button id="manage-btn" class="header-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"></path></svg>
+        Copropiedades
+      </button>
     </div>
   </header>
 
@@ -62,12 +68,40 @@
         </div>
         <div class="field">
           <label for="copropiedad">Copropiedad</label>
-          <input id="copropiedad" name="copropiedad" list="copropiedades-list" placeholder="Ej: Torres del Parque" required autocomplete="off">
-          <datalist id="copropiedades-list"></datalist>
+          <select id="copropiedad" name="copropiedad" required>
+            <option value="" disabled selected>Selecciona una copropiedad</option>
+          </select>
+          <button type="button" id="quick-add-toggle" class="link-btn">+ Agregar nueva copropiedad</button>
+          <div id="quick-add-row" class="quick-add-row" hidden>
+            <input type="text" id="quick-add-input" placeholder="Nombre de la copropiedad">
+            <button type="button" id="quick-add-confirm" class="btn btn--small">Agregar</button>
+          </div>
         </div>
         <p id="form-error" class="form-error" hidden></p>
         <button type="submit" class="btn btn--primary btn--block" id="submit-btn">Guardar tarea</button>
       </form>
+    </div>
+  </div>
+
+  <div id="manage-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="manage-title">
+      <div class="modal__header">
+        <h2 id="manage-title">Copropiedades</h2>
+        <button id="manage-close" class="modal__close" type="button" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+
+      <form id="manage-form" class="manage-add-form">
+        <input type="text" id="manage-input" placeholder="Nombre de la nueva copropiedad" required>
+        <button type="submit" class="btn btn--small">Agregar</button>
+      </form>
+      <p id="manage-error" class="form-error" hidden></p>
+
+      <ul id="manage-list" class="manage-list"></ul>
+      <p id="manage-empty" class="empty-state" hidden>
+        <span>Aún no has agregado copropiedades.</span>
+      </p>
     </div>
   </div>
 
