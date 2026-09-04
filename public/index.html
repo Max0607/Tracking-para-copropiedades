@@ -105,6 +105,55 @@
     </div>
   </div>
 
+  <div id="detail-backdrop" class="modal-backdrop" hidden>
+    <div class="modal modal--detail" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <div class="modal__header">
+        <h2 id="detail-title">Detalle de la tarea</h2>
+        <button id="detail-close" class="modal__close" type="button" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+
+      <div class="detail-task">
+        <span id="detail-tag" class="task-card__tag"></span>
+        <p id="detail-description" class="detail-task__description"></p>
+        <p id="detail-dates" class="detail-task__dates"></p>
+      </div>
+
+      <div class="detail-notes">
+        <h3 class="detail-notes__heading">Notas</h3>
+        <ul id="notes-list" class="notes-list"></ul>
+        <p id="notes-empty" class="notes-empty" hidden>Aún no hay notas. Agrega la primera abajo.</p>
+      </div>
+
+      <form id="note-form" class="note-form">
+        <textarea id="note-text" rows="2" placeholder="Escribe una nota (ej: se pidió cotización, quedó pendiente el repuesto...)"></textarea>
+        <div id="note-photo-preview" class="note-photo-preview" hidden>
+          <img id="note-photo-preview-img" alt="Vista previa de la foto">
+          <button type="button" id="note-photo-remove" class="note-photo-remove" aria-label="Quitar foto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <p id="note-error" class="form-error" hidden></p>
+        <div class="note-form__row">
+          <label class="note-photo-btn" id="note-photo-label">
+            <input type="file" id="note-photo-input" accept="image/*" capture="environment" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-2h6l2 2h3v13H4z"></path><circle cx="12" cy="13" r="3.3"></circle></svg>
+            Foto
+          </label>
+          <button type="submit" class="btn btn--primary btn--small" id="note-submit">Agregar nota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <button id="lightbox-close" class="lightbox__close" type="button" aria-label="Cerrar imagen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+    <img id="lightbox-img" alt="Foto de la nota">
+  </div>
+
   <footer class="app-footer">
     <p>Los datos quedan guardados de forma permanente.</p>
   </footer>

@@ -4,6 +4,9 @@ const API_COPROPIEDADES = '/api/copropiedades';
 const state = {
   tasks: [],
   copropiedades: [],
+  notes: [],
+  activeTaskId: null,
+  pendingPhoto: null,
   tab: 'pending',
   filter: 'all',
   loading: true,
@@ -61,6 +64,24 @@ const els = {
   manageError: document.getElementById('manage-error'),
   manageList: document.getElementById('manage-list'),
   manageEmpty: document.getElementById('manage-empty'),
+  detailBackdrop: document.getElementById('detail-backdrop'),
+  detailClose: document.getElementById('detail-close'),
+  detailTag: document.getElementById('detail-tag'),
+  detailDescription: document.getElementById('detail-description'),
+  detailDates: document.getElementById('detail-dates'),
+  notesList: document.getElementById('notes-list'),
+  notesEmpty: document.getElementById('notes-empty'),
+  noteForm: document.getElementById('note-form'),
+  noteText: document.getElementById('note-text'),
+  noteError: document.getElementById('note-error'),
+  noteSubmit: document.getElementById('note-submit'),
+  notePhotoInput: document.getElementById('note-photo-input'),
+  notePhotoPreview: document.getElementById('note-photo-preview'),
+  notePhotoPreviewImg: document.getElementById('note-photo-preview-img'),
+  notePhotoRemove: document.getElementById('note-photo-remove'),
+  lightbox: document.getElementById('lightbox'),
+  lightboxImg: document.getElementById('lightbox-img'),
+  lightboxClose: document.getElementById('lightbox-close'),
 };
 
 /* ---------- Modal: nueva tarea ---------- */
@@ -237,6 +258,230 @@ function renderManageList() {
   });
 }
 
+/* ---------- Modal: detalle de tarea (notas y fotos) ---------- */
+function openDetail(task) {
+  state.activeTaskId = task.id;
+  state.notes = [];
+  els.detailTag.textContent = task.copropiedad;
+  els.detailTag.style.setProperty('--task-color', colorForName(task.copropiedad));
+  els.detailDescription.textContent = task.description;
+  els.detailDates.textContent = task.completed
+    ? `Agregada: ${formatDate(task.created_at)} · Completada: ${formatDate(task.completed_at)}`
+    : `Agregada: ${formatDate(task.created_at)}`;
+  renderNotes();
+  els.detailBackdrop.hidden = false;
+  document.addEventListener('keydown', onDetailKeydown);
+  fetchNotes(task.id);
+}
+function closeDetail() {
+  els.detailBackdrop.hidden = true;
+  state.activeTaskId = null;
+  els.noteForm.reset();
+  els.noteError.hidden = true;
+  clearPendingPhoto();
+  document.removeEventListener('keydown', onDetailKeydown);
+}
+function onDetailKeydown(e) {
+  if (e.key === 'Escape') closeDetail();
+}
+els.detailClose.addEventListener('click', closeDetail);
+els.detailBackdrop.addEventListener('click', (e) => {
+  if (e.target === els.detailBackdrop) closeDetail();
+});
+
+async function fetchNotes(taskId) {
+  try {
+    const res = await fetch(`${API_TASKS}/${taskId}/notes`);
+    if (!res.ok) throw new Error('request-failed');
+    state.notes = await res.json();
+  } catch (err) {
+    state.notes = [];
+  }
+  renderNotes();
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+
+function noteIconSvg() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4z"></path></svg>';
+}
+
+function renderNotes() {
+  els.notesList.innerHTML = '';
+  if (!state.notes.length) {
+    els.notesEmpty.hidden = false;
+    return;
+  }
+  els.notesEmpty.hidden = true;
+  state.notes.forEach((note) => {
+    const li = document.createElement('li');
+    li.className = 'note-item';
+
+    if (note.image_data) {
+      const img = document.createElement('img');
+      img.className = 'note-item__image';
+      img.src = note.image_data;
+      img.alt = 'Foto adjunta a la nota';
+      img.addEventListener('click', () => openLightbox(note.image_data));
+      li.appendChild(img);
+    }
+    if (note.text) {
+      const p = document.createElement('p');
+      p.className = 'note-item__text';
+      p.textContent = note.text;
+      li.appendChild(p);
+    }
+    const date = document.createElement('p');
+    date.className = 'note-item__date';
+    date.textContent = formatDateTime(note.created_at);
+    li.appendChild(date);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'note-item__delete';
+    del.setAttribute('aria-label', 'Eliminar nota');
+    del.innerHTML = trashIconSvg();
+    del.addEventListener('click', () => deleteNote(note.id));
+    li.appendChild(del);
+
+    els.notesList.appendChild(li);
+  });
+}
+
+function updateTaskNotesCount(delta) {
+  const task = state.tasks.find((t) => t.id === state.activeTaskId);
+  if (task) task.notes_count = Math.max(0, (task.notes_count || 0) + delta);
+  render();
+}
+
+async function deleteNote(id) {
+  if (!confirm('¿Eliminar esta nota?')) return;
+  try {
+    const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('request-failed');
+    state.notes = state.notes.filter((n) => n.id !== id);
+    renderNotes();
+    updateTaskNotesCount(-1);
+  } catch (err) {
+    els.noteError.textContent = 'No se pudo eliminar la nota. Intenta de nuevo.';
+    els.noteError.hidden = false;
+  }
+}
+
+/* ---------- Comprimir foto en el navegador antes de subirla ---------- */
+function compressImage(file) {
+  const MAX_DIM = 1280;
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      reject(new Error('Selecciona un archivo de imagen.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('No se pudo procesar la imagen.'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round(height * (MAX_DIM / width));
+            width = MAX_DIM;
+          } else {
+            width = Math.round(width * (MAX_DIM / height));
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function clearPendingPhoto() {
+  state.pendingPhoto = null;
+  els.notePhotoPreview.hidden = true;
+  els.notePhotoPreviewImg.src = '';
+  els.notePhotoInput.value = '';
+}
+
+els.notePhotoInput.addEventListener('change', async () => {
+  const file = els.notePhotoInput.files[0];
+  if (!file) return;
+  els.noteError.hidden = true;
+  try {
+    const dataUrl = await compressImage(file);
+    state.pendingPhoto = dataUrl;
+    els.notePhotoPreviewImg.src = dataUrl;
+    els.notePhotoPreview.hidden = false;
+  } catch (err) {
+    els.noteError.textContent = err.message;
+    els.noteError.hidden = false;
+  } finally {
+    els.notePhotoInput.value = '';
+  }
+});
+els.notePhotoRemove.addEventListener('click', clearPendingPhoto);
+
+els.noteForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = els.noteText.value.trim();
+  const image = state.pendingPhoto;
+  if (!text && !image) {
+    els.noteError.textContent = 'Escribe algo o adjunta una foto para guardar la nota.';
+    els.noteError.hidden = false;
+    return;
+  }
+  els.noteSubmit.disabled = true;
+  els.noteError.hidden = true;
+  try {
+    const res = await fetch(`${API_TASKS}/${state.activeTaskId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, image_data: image }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'No se pudo guardar la nota.');
+    }
+    const note = await res.json();
+    state.notes.push(note);
+    renderNotes();
+    updateTaskNotesCount(1);
+    els.noteText.value = '';
+    clearPendingPhoto();
+  } catch (err) {
+    els.noteError.textContent = err.message;
+    els.noteError.hidden = false;
+  } finally {
+    els.noteSubmit.disabled = false;
+  }
+});
+
+/* ---------- Visor de imágenes a pantalla completa ---------- */
+function openLightbox(src) {
+  els.lightboxImg.src = src;
+  els.lightbox.hidden = false;
+}
+function closeLightbox() {
+  els.lightbox.hidden = true;
+  els.lightboxImg.src = '';
+}
+els.lightboxClose.addEventListener('click', closeLightbox);
+els.lightbox.addEventListener('click', (e) => {
+  if (e.target === els.lightbox) closeLightbox();
+});
+
 /* ---------- Datos: tareas ---------- */
 async function loadTasks() {
   state.loading = true;
@@ -368,6 +613,7 @@ function renderTaskCard(task) {
 
   const body = document.createElement('div');
   body.className = 'task-card__body';
+  body.addEventListener('click', () => openDetail(task));
 
   const desc = document.createElement('p');
   desc.className = 'task-card__description';
@@ -385,6 +631,13 @@ function renderTaskCard(task) {
     ? `Completada: ${formatDate(task.completed_at)}`
     : `Agregada: ${formatDate(task.created_at)}`;
   meta.appendChild(dateSpan);
+
+  if (task.notes_count > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'task-card__notes-badge';
+    badge.innerHTML = noteIconSvg() + task.notes_count;
+    meta.appendChild(badge);
+  }
 
   body.appendChild(desc);
   body.appendChild(meta);
